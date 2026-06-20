@@ -1,0 +1,5 @@
+# Solar PV scoring thresholds (see scoring._solar).
+ghi_lo: 3.5        # kWh/m2/day mapping to 0
+ghi_hi: 6.5        # kWh/m2/day mapping to 1
+slope_ideal: 25    # deg, above which usable area starts to fall
+slope_max: 45      # deg, unusable

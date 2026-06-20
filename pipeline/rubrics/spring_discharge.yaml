@@ -1,0 +1,5 @@
+# Karst spring discharge (see scoring._spring_discharge).
+# Anchors: Verinag 4.55, Sherbagh 1.97, Kokernag 1.16, Martand 0.91, Achabal 0.67 m3/s;
+# five Anantnag super-springs ~9 m3/s combined. Collapse: Aripal/Bulbul/Dilnag 2024-25.
+cumec_scale: 25            # discharge(m3/s) * scale * 100 -> 0..100 (0.04 m3/s ~ 100)
+collapse_threshold: 0.25   # >=25% decline from 2018 baseline -> imminent-collapse penalty

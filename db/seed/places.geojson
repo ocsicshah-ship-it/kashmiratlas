@@ -1,0 +1,73 @@
+{
+  "type": "FeatureCollection",
+  "name": "pilot_named_places",
+  "crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Doodhpathri",
+        "name_local": "دودھ پتھری",
+        "kind": "tourism_meadow",
+        "district": "Budgam",
+        "population": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [74.66, 33.85],
+            [74.73, 33.85],
+            [74.73, 33.90],
+            [74.66, 33.90],
+            [74.66, 33.85]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Yusmarg",
+        "name_local": "یوسمرگ",
+        "kind": "tourism_meadow",
+        "district": "Budgam",
+        "population": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [74.64, 33.79],
+            [74.70, 33.79],
+            [74.70, 33.83],
+            [74.64, 33.83],
+            [74.64, 33.79]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Mujhpathri",
+        "name_local": "مُج پتھری",
+        "kind": "village",
+        "district": "Budgam",
+        "population": 1200
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [74.70, 33.88],
+            [74.76, 33.88],
+            [74.76, 33.93],
+            [74.70, 33.93],
+            [74.70, 33.88]
+          ]
+        ]
+      }
+    }
+  ]
+}

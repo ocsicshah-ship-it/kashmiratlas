@@ -1,0 +1,13 @@
+{
+  "name": "kashmiratlas",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "npm --workspace @kashmiratlas/frontend run dev",
+    "build": "npm --workspace @kashmiratlas/frontend run build"
+  }
+}
