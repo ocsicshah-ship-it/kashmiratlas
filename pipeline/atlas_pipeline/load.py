@@ -1,13 +1,19 @@
-"""Load cells, places and the place<->cell join into PostGIS."""
+"""Load cells, places and the place<->cell join into PostGIS.
+
+H3 geometry is computed in Python (h3-py + shapely), so the database needs only
+stock PostGIS — no h3-pg extension required.
+"""
 
 from __future__ import annotations
 
 import json
+import unicodedata
 from pathlib import Path
 from typing import Any
 
+import h3
 import psycopg
-import unicodedata
+from shapely.geometry import Polygon, shape
 
 from .cells import Cell
 
@@ -15,6 +21,12 @@ from .cells import Cell
 def _normalize(name: str) -> str:
     nkfd = unicodedata.normalize("NFKD", name)
     return "".join(c for c in nkfd if not unicodedata.combining(c)).lower().strip()
+
+
+def _cell_polygon(h3_index: str) -> Polygon:
+    """Shapely polygon (lng, lat) for an H3 cell boundary."""
+    ring = [(lng, lat) for lat, lng in h3.cell_to_boundary(h3_index)]
+    return Polygon(ring)
 
 
 def upsert_cells(
@@ -101,33 +113,38 @@ def load_places(conn: psycopg.Connection, geojson_path: str | Path) -> int:
     return written
 
 
-def rebuild_place_cell(conn: psycopg.Connection) -> int:
+def rebuild_place_cell(conn: psycopg.Connection, cells: list[Cell]) -> int:
     """Recompute the place<->cell junction with overlap fractions.
 
-    Cell polygons are derived on the fly from the H3 index via h3-pg
-    (h3_cell_to_boundary_geometry); we never store them. Overlap fraction is the
-    planar intersection-area ratio (adequate for weighting at this scale).
+    Cell polygons are derived from the H3 index with h3-py; overlap fraction is the
+    planar intersection-area ratio (adequate for weighting at this scale). Computed
+    in Python with shapely so no PostGIS<->H3 bridge is needed.
     """
     with conn.cursor() as cur:
+        cur.execute("SELECT place_id, ST_AsGeoJSON(geom::geometry) FROM named_place")
+        places = [(pid, shape(json.loads(gj))) for pid, gj in cur.fetchall()]
+
+    rows: list[tuple[int, str, float]] = []
+    for c in cells:
+        poly = _cell_polygon(c.h3_index)
+        cell_area = poly.area
+        if cell_area <= 0:
+            continue
+        for pid, pgeom in places:
+            if not poly.intersects(pgeom):
+                continue
+            frac = poly.intersection(pgeom).area / cell_area
+            if frac > 0:
+                rows.append((pid, c.h3_index, max(0.0001, min(1.0, frac))))
+
+    with conn.cursor() as cur:
         cur.execute("TRUNCATE place_cell")
-        cur.execute(
-            """
-            INSERT INTO place_cell (place_id, h3_index, overlap_fraction)
-            SELECT p.place_id, g.h3_index,
-                   GREATEST(0.0001, LEAST(1.0,
-                       ST_Area(ST_Intersection(cell.geom, pg.geom)) /
-                       NULLIF(ST_Area(cell.geom), 0)))::real
-            FROM named_place p
-            JOIN LATERAL (SELECT p.geom::geometry AS geom) pg ON TRUE
-            JOIN grid_cell g ON TRUE
-            JOIN LATERAL (
-                SELECT h3_cell_to_boundary_geometry(g.h3_index::h3index) AS geom
-            ) cell ON ST_Intersects(cell.geom, pg.geom)
-            """
+        cur.executemany(
+            "INSERT INTO place_cell (place_id, h3_index, overlap_fraction) VALUES (%s, %s, %s)",
+            rows,
         )
-        written = cur.rowcount
     conn.commit()
-    return written
+    return len(rows)
 
 
 def refresh_rollups(conn: psycopg.Connection) -> None:

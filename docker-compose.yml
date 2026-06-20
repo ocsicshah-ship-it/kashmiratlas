@@ -1,9 +1,7 @@
 services:
   postgis:
-    build:
-      context: ./db
-      dockerfile: Dockerfile
-    image: kashmiratlas/postgis-h3:16-3.4
+    # Stock PostGIS is sufficient — H3 math runs in Python (pipeline + API).
+    image: postgis/postgis:16-3.4
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-atlas}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-atlas}

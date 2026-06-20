@@ -1,12 +1,10 @@
 """Zonal aggregation of source rasters to H3 cells (Phase 1+).
 
-Phase 0 uses synthetic.py instead of this module. The interface below is what the
-real ingestion implements: build cell-boundary geometries once, then for each raster
-run zonal statistics (mean for continuous bands, modal class + histogram for
-categorical land cover) and merge the results into each cell's raw-parameter dict.
+Aggregates DEM / land-cover / solar rasters onto each H3 cell: area-weighted mean
+for continuous bands, modal class for categorical land cover. Phase 0 uses
+synthetic.py instead; this module is used once real rasters are available.
 
-The heavy geospatial dependencies (rasterio, geopandas, exactextract) are optional
-extras — install with `pip install -e .[raster]` before using this module.
+Heavy geospatial deps (rasterio) are an optional extra:  pip install -e .[raster]
 """
 
 from __future__ import annotations
@@ -15,25 +13,86 @@ from collections.abc import Iterable
 from pathlib import Path
 
 import h3
+import numpy as np
 
 from .cells import Cell
 
 
-def cell_boundary_geojson(cell: Cell) -> dict:
+def cell_boundary_geojson(cell_or_index: Cell | str) -> dict:
     """GeoJSON Polygon (lng, lat order) for an H3 cell, for zonal extraction."""
-    ring = [(lng, lat) for lat, lng in h3.cell_to_boundary(cell.h3_index)]
+    idx = cell_or_index.h3_index if isinstance(cell_or_index, Cell) else cell_or_index
+    ring = [[lng, lat] for lat, lng in h3.cell_to_boundary(idx)]
     ring.append(ring[0])
     return {"type": "Polygon", "coordinates": [ring]}
 
 
-def zonal_raw(cells: Iterable[Cell], rasters: dict[str, Path]) -> dict[str, dict]:
-    """Return {h3_index: raw_params} from zonal stats over the given rasters.
+def _zonal_one(src, geom: dict, categorical: bool) -> float | int | None:
+    """Mean (continuous) or modal class (categorical) of a raster within a polygon."""
+    from rasterio.mask import mask as rio_mask
 
-    `rasters` maps a logical name (e.g. 'dem', 'worldcover', 'ghi') to a GeoTIFF
-    path. Implemented in Phase 1; raises until then so callers fail loudly rather
-    than silently producing empty data.
+    try:
+        out, _ = rio_mask(src, [geom], crop=True, filled=False)
+    except ValueError:
+        return None  # polygon does not overlap the raster
+    band = out[0]
+    data = band.compressed() if hasattr(band, "compressed") else band[~np.isnan(band)]
+    if data.size == 0:
+        return None
+    if categorical:
+        values, counts = np.unique(data, return_counts=True)
+        return int(values[int(np.argmax(counts))])
+    return float(np.mean(data))
+
+
+def zonal_raw(
+    cells: Iterable[Cell],
+    rasters: dict[str, Path],
+    categorical: set[str] | None = None,
+) -> dict[str, dict]:
+    """Return {h3_index: {raster_name: value}} from zonal stats over the rasters.
+
+    `rasters` maps a logical name (e.g. 'elevation_m', 'landcover', 'ghi_kwh_m2_day')
+    to a GeoTIFF path. `categorical` names the rasters aggregated by modal class.
     """
-    raise NotImplementedError(
-        "Raster zonal aggregation is a Phase-1 task. For Phase 0 run the pipeline "
-        "with --synthetic to generate scores without rasters."
-    )
+    import rasterio
+
+    categorical = categorical or set()
+    cells = list(cells)
+    out: dict[str, dict] = {c.h3_index: {} for c in cells}
+
+    for name, path in rasters.items():
+        is_cat = name in categorical
+        with rasterio.open(path) as src:
+            for cell in cells:
+                geom = cell_boundary_geojson(cell)
+                val = _zonal_one(src, geom, is_cat)
+                if val is not None:
+                    out[cell.h3_index][name] = val
+    return out
+
+
+def derive_slope_aspect(dem_path: Path, out_dir: Path) -> dict[str, Path]:
+    """Derive slope (deg) and aspect (deg) GeoTIFFs from a DEM via numpy gradient.
+
+    Returns {'slope_deg': path, 'aspect_deg': path}. Uses a simple Horn-style
+    gradient; for production prefer gdaldem/richdem.
+    """
+    import rasterio
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    with rasterio.open(dem_path) as src:
+        z = src.read(1).astype("float64")
+        px = src.transform.a
+        py = -src.transform.e
+        dzdx, dzdy = np.gradient(z, px, py)
+        slope = np.degrees(np.arctan(np.hypot(dzdx, dzdy)))
+        aspect = (np.degrees(np.arctan2(dzdy, -dzdx)) + 360) % 360
+        profile = src.profile
+        profile.update(dtype="float32", count=1)
+        paths = {}
+        for nm, arr in (("slope_deg", slope), ("aspect_deg", aspect)):
+            p = out_dir / f"{nm}.tif"
+            with rasterio.open(p, "w", **profile) as dst:
+                dst.write(arr.astype("float32"), 1)
+            paths[nm] = p
+    return paths

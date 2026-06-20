@@ -25,10 +25,23 @@ Three guiding decisions:
 
 1. **No hexagon polygons are stored or served.** We serve compact `h3_index` + score arrays and
    reconstruct geometry client-side on the GPU via deck.gl `H3HexagonLayer`. No tile server needed.
-2. **deck.gl is the single hex-rendering engine in both modes.** 2.5D = deck.gl over MapLibre;
-   3D = the *same* deck.gl layer driven by a Cesium camera. One layer factory, one data array.
+2. **One shared hex data array + colour logic drives both modes.** 2.5D = deck.gl `H3HexagonLayer`
+   over MapLibre; 3D = native Cesium polygons over Cesium World Terrain. The mode toggle preserves
+   camera, selected domain, and selection.
 3. **Phase 0 ships synthetic-but-realistic scores** for the Budgam/Doodhpathri–Yusmarg pilot tile so
    the full vertical slice works before any raster ingestion exists.
+
+> **H3 math runs in Python** (h3-py) in the pipeline and API, so the database needs only stock
+> **PostGIS** — no custom `h3-pg` image. (An optional h3-pg image lives in `db/optional/` if you want
+> H3 lookups in SQL.) **42 spatially-scoreable capability domains** are defined; see
+> [`docs/DOMAIN_CATALOG.md`](docs/DOMAIN_CATALOG.md).
+
+### Verified end-to-end
+
+`db/migrations` → `atlas-pipeline build --synthetic` (3,735 cells / 3 places / 886 place–cell links on
+the pilot) → FastAPI (`/api/hexes` JSON + Arrow, `/api/cell`, `/api/places/search`, `/api/place/{id}`)
+→ Next.js typecheck + production build. CI (`.github/workflows/ci.yml`) reproduces the whole chain
+plus `pytest` on every push.
 
 ## Repository layout
 

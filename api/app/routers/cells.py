@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import h3
 from fastapi import APIRouter, HTTPException, Query
 
 from ..db import pool
@@ -55,13 +56,7 @@ async def cell_by_point(
     lng: float = Query(..., ge=-180, le=180),
 ):
     """Resolve a lat/lng to its H3 res-9 cell and return the cell profile."""
-    async with pool().connection() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                "SELECT h3_lat_lng_to_cell(POINT(%s, %s), 9)::text AS h3", (lng, lat)
-            )
-            row = await cur.fetchone()
-    return await _build_profile(row["h3"])
+    return await _build_profile(h3.latlng_to_cell(lat, lng, 9))
 
 
 @router.get("/cell/{h3_index}", response_model=CellProfile)

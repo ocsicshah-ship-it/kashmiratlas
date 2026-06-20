@@ -53,7 +53,7 @@ def build(
     with db.connect() as conn:
         n_cells = load.upsert_cells(conn, cell_list, raw_by_id, scores_by_id)
         n_places = load.load_places(conn, places)
-        n_join = load.rebuild_place_cell(conn)
+        n_join = load.rebuild_place_cell(conn, cell_list)
         load.refresh_rollups(conn)
 
     console.print(
