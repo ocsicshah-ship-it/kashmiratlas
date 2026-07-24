@@ -71,6 +71,23 @@ def zonal_raw(
     return out
 
 
+# ESA WorldCover 2021 v200 classes -> atlas land-cover categories.
+WORLDCOVER_TO_CATEGORY = {
+    10: "forest", 20: "grassland", 30: "grassland", 40: "cropland", 50: "built",
+    60: "bare", 70: "snow", 80: "water", 90: "wetland", 95: "wetland", 100: "bare",
+}
+
+
+def modal_landcover(cells: Iterable[Cell], worldcover_path: Path) -> dict[str, str]:
+    """Per-cell dominant land-cover category from an ESA WorldCover raster (modal class)."""
+    stats = zonal_raw(list(cells), {"_wc": Path(worldcover_path)}, categorical={"_wc"})
+    return {
+        h3: WORLDCOVER_TO_CATEGORY.get(int(t["_wc"]), "bare")
+        for h3, t in stats.items()
+        if "_wc" in t
+    }
+
+
 def terrain_from_dem(cells: Iterable[Cell], dem_path: Path, work_dir: Path) -> dict[str, dict]:
     """Per-cell {elevation_m, slope_deg, aspect_deg} zonal-aggregated from a DEM.
 

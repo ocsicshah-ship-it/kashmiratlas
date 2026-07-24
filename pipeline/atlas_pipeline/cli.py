@@ -28,6 +28,9 @@ def build(
     dem: Path = typer.Option(
         None, "--dem", help="DEM GeoTIFF: real terrain (elevation/slope/aspect) per cell (Phase 1)."
     ),
+    landcover: Path = typer.Option(
+        None, "--landcover", help="ESA WorldCover GeoTIFF: real modal land cover per cell (Phase 1)."
+    ),
     places: Path = typer.Option(
         _SEED_PLACES, "--places", help="GeoJSON of named places to load (Layer 2)."
     ),
@@ -37,8 +40,10 @@ def build(
     cell_list = cells_mod.cells_for_geojson(aoi, res)
     console.print(f"  → {len(cell_list):,} H3 cells")
 
-    if not synthetic_mode and dem is None:
-        raise typer.BadParameter("Pass --synthetic (Phase 0) and/or --dem <GeoTIFF> (Phase 1 terrain).")
+    if not synthetic_mode and dem is None and landcover is None:
+        raise typer.BadParameter(
+            "Pass --synthetic (Phase 0) and/or --dem / --landcover <GeoTIFF> (Phase 1)."
+        )
 
     terrain: dict[str, dict] = {}
     if dem is not None:
@@ -48,6 +53,14 @@ def build(
         work = Path(__file__).resolve().parents[1] / ".terrain_work"
         terrain = zonal.terrain_from_dem(cell_list, dem, work)
         console.print(f"  → real terrain for {len(terrain):,}/{len(cell_list):,} cells")
+    if landcover is not None:
+        from . import zonal
+
+        console.print(f"Aggregating real land cover from [cyan]{landcover}[/] …")
+        lc = zonal.modal_landcover(cell_list, landcover)
+        for h3_index, cat in lc.items():
+            terrain.setdefault(h3_index, {})["landcover"] = cat
+        console.print(f"  → real land cover for {len(lc):,}/{len(cell_list):,} cells")
 
     console.print("Generating raw parameters …")
     raw_by_id = {c.h3_index: synthetic.synth_raw(c, terrain.get(c.h3_index)) for c in cell_list}

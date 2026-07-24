@@ -88,6 +88,15 @@ def test_terrain_from_dem_flat(tmp_path):
         assert t["slope_deg"] < 1.0  # flat surface
 
 
+def test_modal_landcover_maps_worldcover(tmp_path):
+    cells = cells_for_geojson(AOI, res=9)[:15]
+    p = tmp_path / "wc.tif"
+    _write_constant_raster(p, 10.0, (74.5, 33.7, 74.9, 34.0))  # WorldCover 10 = tree cover
+    lc = zonal.modal_landcover(cells, p)
+    assert lc, "no cells got land cover"
+    assert set(lc.values()) == {"forest"}  # class 10 -> forest
+
+
 def test_synth_raw_honours_real_terrain():
     from atlas_pipeline import synthetic
     cell = cells_for_geojson(AOI, res=9)[0]

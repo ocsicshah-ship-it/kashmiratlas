@@ -52,7 +52,12 @@ def synth_raw(cell: Cell, terrain: dict | None = None) -> dict:
     # Soil: karewa more likely at lower benches, mountain soils up high.
     soil = "karewa" if (elevation_m < 1750 and h("soil") > 0.5) else _SOILS[int(h("soil2") * len(_SOILS))]
     soil_ph = round(4.5 + h("ph") * 3.3, 2) if soil == "karewa" else round(5.8 + h("ph") * 2.0, 2)
-    landcover = "meadow" if elevation_m > 2500 else _LANDCOVER[int(h("lc") * len(_LANDCOVER))]
+    if real.get("landcover"):
+        lc = real["landcover"]
+        # a real DEM lets us refine WorldCover "grassland" up high into alpine meadow.
+        landcover = "meadow" if (lc == "grassland" and elevation_m > 2500) else lc
+    else:
+        landcover = "meadow" if elevation_m > 2500 else _LANDCOVER[int(h("lc") * len(_LANDCOVER))]
     geology = _GEOLOGY[int(h("geo") * len(_GEOLOGY))]
 
     perennial = h("stream") > 0.6
