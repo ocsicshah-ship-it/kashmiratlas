@@ -26,8 +26,12 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-atlas}:${POSTGRES_PASSWORD:-atlas}@postgis:5432/${POSTGRES_DB:-kashmiratlas}
       API_CORS_ORIGINS: ${API_CORS_ORIGINS:-http://localhost:3000}
+      ATLAS_WEB_DIR: /srv/web
     ports:
       - "${API_PORT:-8000}:8000"
+    volumes:
+      # Serve the designed atlas page same-origin with the API.
+      - ./web:/srv/web:ro
     depends_on:
       postgis:
         condition: service_healthy

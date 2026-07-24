@@ -14,12 +14,24 @@ A two-layer geospatial capability atlas for the Kashmir Valley, visualized in a 
 ## Architecture
 
 ```
- Pipeline (Python)        API (FastAPI)            Frontend (Next.js + deck.gl)
- ────────────────         ─────────────            ───────────────────────────
- H3 cells + scoring  ───▶ PostGIS (+h3-pg)  ◀────  2.5D: deck.gl over MapLibre
- zonal raster stats       REST + Arrow             3D:   deck.gl over CesiumJS
-                                                   (one shared H3HexagonLayer)
+ Pipeline (Python)        API (FastAPI)            Frontends
+ ────────────────         ─────────────            ─────────
+ H3 cells + scoring  ───▶ PostGIS           ◀────  web/  — designed atlas page
+ zonal raster stats       REST + Arrow             (Leaflet + h3, served at /,
+                          serves web/ at /          live /api scores + hex overlay)
+                                             ◀────  frontend/ — deck.gl + Cesium
+                                                   3D lab (2.5D map + 3D globe)
 ```
+
+Two frontends share the one backend:
+
+- **`web/index.html`** — the primary, designed single-page atlas (Leaflet + h3-js, whole‑UT
+  agro-climatic zones, a 192‑species value register, coordinate → H3 cell lookup, place drawer).
+  Served **same-origin by the API at `/`**, so its `fetch('/api/...')` needs no CORS. Where the H3
+  grid is loaded it shows **real 42-domain scores** from `/api/cell` and `/api/place` and a
+  toggleable **live-hex overlay** from `/api/hexes`; elsewhere it falls back to its zone model
+  (clearly labeled). Third-party libs are vendored under `web/vendor/` (no CDN dependency).
+- **`frontend/`** — the deck.gl + MapLibre (2.5D) / CesiumJS (3D globe) lab described below.
 
 Three guiding decisions:
 
@@ -72,7 +84,10 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e .
 atlas-pipeline build --aoi ../sample-data/budgam_pilot.geojson --res 9 --synthetic
 
-# 3. Frontend
+# → the designed atlas is now live at  http://localhost:8000/  (served by the API,
+#   with real /api scores where the grid is loaded + a Live-grid hex overlay)
+
+# 3. (Optional) the deck.gl + Cesium 3D lab
 cd ../frontend
 npm install
 npm run dev                   # http://localhost:3000

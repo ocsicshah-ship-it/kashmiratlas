@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from .db import close_pool, open_pool
 from .routers import cells, hexes, places
@@ -45,3 +47,10 @@ app.include_router(hexes.router, prefix="/api")
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+# Serve the designed single-page atlas (web/index.html) same-origin, so its
+# fetch('/api/...') calls need no CORS. Mounted last so /api and /health win.
+_web_dir = os.environ.get("ATLAS_WEB_DIR") or str(Path(__file__).resolve().parents[2] / "web")
+if Path(_web_dir).is_dir():
+    app.mount("/", StaticFiles(directory=_web_dir, html=True), name="web")

@@ -49,6 +49,9 @@ jobs:
           curl -sf "http://127.0.0.1:8000/api/hexes?zoom=12" | python -c "import sys,json; assert json.load(sys.stdin)['count']>1000"
           curl -sf "http://127.0.0.1:8000/api/cell?lat=33.88&lng=74.70" | python -c "import sys,json; d=json.load(sys.stdin); assert d['scores'] and 'h3_index' in d"
           curl -sf "http://127.0.0.1:8000/api/places/search?q=dood" | python -c "import sys,json; assert len(json.load(sys.stdin))>=1"
+          # designed atlas page is served same-origin with the API
+          curl -sf "http://127.0.0.1:8000/" | grep -q "Capability Atlas"
+          curl -sf "http://127.0.0.1:8000/vendor/h3-js.umd.js" -o /dev/null
 
   frontend:
     runs-on: ubuntu-latest
