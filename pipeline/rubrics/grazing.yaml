@@ -1,0 +1,2 @@
+# Grazing scoring (see scoring._grazing). Carrying capacity in sheep-units/ha/season.
+su_full: 6   # sheep-units mapping to score 100

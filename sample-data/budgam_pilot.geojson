@@ -1,0 +1,29 @@
+{
+  "type": "FeatureCollection",
+  "name": "budgam_pilot_aoi",
+  "crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Budgam / Mujhpathri–Doodhpathri–Yusmarg pilot corridor",
+        "note": "Phase-0 alpine-meadow + deodar/pine + Shaliganga-stream test bed (~2,730 m)."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [74.62, 33.78],
+            [74.78, 33.78],
+            [74.84, 33.86],
+            [74.80, 33.96],
+            [74.66, 33.98],
+            [74.56, 33.90],
+            [74.58, 33.82],
+            [74.62, 33.78]
+          ]
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+# Apple suitability thresholds (see scoring._apple).
+# Optimal belt 1,500–2,700 m, 1,000–1,500 chilling hours below 7C.
+chill_lo: 800
+chill_hi: 1400

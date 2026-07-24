@@ -1,0 +1,2 @@
+# Micro-hydro scoring (see scoring._hydro). est_power_kw from P = rho*g*Q*H*eta.
+power_full_kw: 150   # kW mapping to score 100

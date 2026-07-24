@@ -1,0 +1,4 @@
+# Wasabi (sawa) scoring (see scoring._wasabi).
+# Hard gate: cold flowing spring/stream water. Optimum 10-15C, disqualify > 20C.
+# Anchors: Kokernag 9-14C year-round (benchmark), Verinag (scale-out), 1,876-2,266 m.
+temp_disqualify: 20    # C sustained -> soft-rot / geothermal disqualifier

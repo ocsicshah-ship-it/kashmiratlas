@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgis:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: atlas
+          POSTGRES_PASSWORD: atlas
+          POSTGRES_DB: kashmiratlas
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U atlas -d kashmiratlas"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgresql://atlas:atlas@127.0.0.1:5432/kashmiratlas
+      PGPASSWORD: atlas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install client + packages
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+          python -m pip install -q -U pip
+          pip install -q -e ./pipeline -e ./api pytest rasterio
+      - name: Run migrations
+        run: |
+          for f in db/migrations/0001_extensions.sql db/migrations/0002_tables.sql db/migrations/0003_agg_views.sql; do
+            psql -h 127.0.0.1 -U atlas -d kashmiratlas -v ON_ERROR_STOP=1 -f "$f"
+          done
+      - name: Build pilot grid (synthetic)
+        run: atlas-pipeline build --aoi sample-data/budgam_pilot.geojson --res 9 --synthetic
+      - name: Unit tests
+        run: python -m pytest pipeline/tests -q
+      - name: API smoke test
+        run: |
+          uvicorn app.main:app --app-dir api --host 127.0.0.1 --port 8000 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8000/health && break; sleep 1; done
+          curl -sf "http://127.0.0.1:8000/api/hexes?zoom=12" | python -c "import sys,json; assert json.load(sys.stdin)['count']>1000"
+          curl -sf "http://127.0.0.1:8000/api/cell?lat=33.88&lng=74.70" | python -c "import sys,json; d=json.load(sys.stdin); assert d['scores'] and 'h3_index' in d"
+          curl -sf "http://127.0.0.1:8000/api/places/search?q=dood" | python -c "import sys,json; assert len(json.load(sys.stdin))>=1"
+          # designed atlas page is served same-origin with the API
+          curl -sf "http://127.0.0.1:8000/" | grep -q "Capability Atlas"
+          curl -sf "http://127.0.0.1:8000/vendor/h3-js.umd.js" -o /dev/null
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install deps
+        run: npm ci
+      - name: Typecheck
+        run: npx tsc -p frontend/tsconfig.json --noEmit
+      - name: Build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: npm run build
