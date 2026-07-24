@@ -23,7 +23,10 @@ def build(
     aoi: Path = typer.Option(..., "--aoi", help="GeoJSON area of interest to polyfill."),
     res: int = typer.Option(9, "--res", help="H3 resolution."),
     synthetic_mode: bool = typer.Option(
-        False, "--synthetic", help="Generate synthetic raw params instead of ingesting rasters."
+        False, "--synthetic", help="Generate synthetic raw params (Phase 0)."
+    ),
+    dem: Path = typer.Option(
+        None, "--dem", help="DEM GeoTIFF: real terrain (elevation/slope/aspect) per cell (Phase 1)."
     ),
     places: Path = typer.Option(
         _SEED_PLACES, "--places", help="GeoJSON of named places to load (Layer 2)."
@@ -34,13 +37,20 @@ def build(
     cell_list = cells_mod.cells_for_geojson(aoi, res)
     console.print(f"  → {len(cell_list):,} H3 cells")
 
-    if not synthetic_mode:
-        raise typer.BadParameter(
-            "Only --synthetic is wired in Phase 0. Raster ingestion (zonal.py) lands in Phase 1."
-        )
+    if not synthetic_mode and dem is None:
+        raise typer.BadParameter("Pass --synthetic (Phase 0) and/or --dem <GeoTIFF> (Phase 1 terrain).")
 
-    console.print("Generating synthetic raw parameters …")
-    raw_by_id = {c.h3_index: synthetic.synth_raw(c) for c in cell_list}
+    terrain: dict[str, dict] = {}
+    if dem is not None:
+        from . import zonal
+
+        console.print(f"Aggregating real terrain from DEM [cyan]{dem}[/] …")
+        work = Path(__file__).resolve().parents[1] / ".terrain_work"
+        terrain = zonal.terrain_from_dem(cell_list, dem, work)
+        console.print(f"  → real terrain for {len(terrain):,}/{len(cell_list):,} cells")
+
+    console.print("Generating raw parameters …")
+    raw_by_id = {c.h3_index: synthetic.synth_raw(c, terrain.get(c.h3_index)) for c in cell_list}
 
     console.print("Scoring cells …")
     rubrics = scoring.load_rubrics(_RUBRIC_DIR)

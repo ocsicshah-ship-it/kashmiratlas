@@ -25,18 +25,27 @@ def _unit_hash(key: str, salt: str) -> float:
     return int(digest[:8], 16) / 0xFFFFFFFF
 
 
-def synth_raw(cell: Cell) -> dict:
-    """Build a deterministic raw-parameter dict for one cell."""
+def synth_raw(cell: Cell, terrain: dict | None = None) -> dict:
+    """Build a deterministic raw-parameter dict for one cell.
+
+    If ``terrain`` is given (e.g. {'elevation_m','slope_deg','aspect_deg'} zonal-
+    aggregated from a real DEM), those values are used verbatim and every
+    elevation/slope-dependent field downstream is grounded in the real terrain;
+    the remaining un-sourced fields stay deterministic-synthetic. If ``terrain``
+    is None, a modelled elevation surface is used (Phase 0).
+    """
     h = lambda s: _unit_hash(cell.h3_index, s)  # noqa: E731
+    real = terrain or {}
 
-    # Elevation: valley floor in the NE, rising toward the SW alpine meadows,
-    # plus per-cell noise. Pilot corridor sits roughly 1,600–3,000 m.
-    base = 1600 + (33.98 - cell.lat) * 5200 + (74.84 - cell.lng) * 1500
-    elevation_m = round(base + (h("elev") - 0.5) * 350, 1)
-    elevation_m = max(1550.0, min(3300.0, elevation_m))
+    if real.get("elevation_m") is not None:
+        elevation_m = round(float(real["elevation_m"]), 1)
+    else:
+        # Modelled: valley floor in the NE, rising toward the SW alpine meadows.
+        base = 1600 + (33.98 - cell.lat) * 5200 + (74.84 - cell.lng) * 1500
+        elevation_m = max(1550.0, min(3300.0, round(base + (h("elev") - 0.5) * 350, 1)))
 
-    slope_deg = round(2 + h("slope") * 38, 1)
-    aspect_deg = h("aspect") * 360
+    slope_deg = round(float(real["slope_deg"]), 1) if real.get("slope_deg") is not None else round(2 + h("slope") * 38, 1)
+    aspect_deg = float(real["aspect_deg"]) if real.get("aspect_deg") is not None else h("aspect") * 360
     aspect_south_factor = round((1 + math.cos(math.radians(aspect_deg - 180))) / 2, 3)
     relief_m = round(20 + h("relief") * 600, 1)
 
@@ -111,5 +120,6 @@ def synth_raw(cell: Cell) -> dict:
         "bortle": round(2 + (market_access_km < 10) * 3 + (3 - min(3, market_access_km / 15)), 1),
         "snow_leopard_density": round(h("sl") * 3 if elevation_m > 3000 else 0.0, 2),
         # ── meta ──
-        "confidence": 35,  # synthetic data: low confidence
+        # real DEM terrain lifts confidence; fully-synthetic stays low.
+        "confidence": 55 if real.get("elevation_m") is not None else 35,
     }

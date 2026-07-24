@@ -84,6 +84,12 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e .
 atlas-pipeline build --aoi ../sample-data/budgam_pilot.geojson --res 9 --synthetic
 
+# ...or with REAL terrain from a DEM (Phase 1 — real elevation/slope/aspect per cell):
+#   curl -L -o ../data/dem_n33_e074.tif \
+#     https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N33_00_E074_00_DEM/Copernicus_DSM_COG_10_N33_00_E074_00_DEM.tif
+#   pip install -e .[raster]
+#   atlas-pipeline build --aoi ../sample-data/budgam_pilot.geojson --res 9 --dem ../data/dem_n33_e074.tif
+
 # → the designed atlas is now live at  http://localhost:8000/  (served by the API,
 #   with real /api scores where the grid is loaded + a Live-grid hex overlay)
 

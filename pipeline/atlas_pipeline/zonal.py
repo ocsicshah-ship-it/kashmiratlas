@@ -71,19 +71,41 @@ def zonal_raw(
     return out
 
 
+def terrain_from_dem(cells: Iterable[Cell], dem_path: Path, work_dir: Path) -> dict[str, dict]:
+    """Per-cell {elevation_m, slope_deg, aspect_deg} zonal-aggregated from a DEM.
+
+    Derives slope/aspect rasters from the DEM once, then zonal-aggregates all three
+    bands onto the H3 cells. Returns {h3_index: terrain_dict}.
+    """
+    cells = list(cells)
+    sa = derive_slope_aspect(Path(dem_path), Path(work_dir))
+    stats = zonal_raw(cells, {"elevation_m": Path(dem_path), **sa})
+    # keep only cells that actually overlapped the DEM
+    return {h3: t for h3, t in stats.items() if "elevation_m" in t}
+
+
 def derive_slope_aspect(dem_path: Path, out_dir: Path) -> dict[str, Path]:
     """Derive slope (deg) and aspect (deg) GeoTIFFs from a DEM via numpy gradient.
 
     Returns {'slope_deg': path, 'aspect_deg': path}. Uses a simple Horn-style
     gradient; for production prefer gdaldem/richdem.
     """
+    import math
+
     import rasterio
 
     out_dir.mkdir(parents=True, exist_ok=True)
     with rasterio.open(dem_path) as src:
         z = src.read(1).astype("float64")
-        px = src.transform.a
-        py = -src.transform.e
+        px = src.transform.a            # x pixel size (units of the CRS)
+        py = -src.transform.e           # y pixel size
+        # DEM elevation is in metres; if the CRS is geographic the pixel spacing is
+        # in degrees, so convert to metres before taking the gradient — otherwise
+        # slope saturates near 90°.
+        if src.crs and src.crs.is_geographic:
+            lat0 = math.radians((src.bounds.top + src.bounds.bottom) / 2)
+            px = px * 111_320.0 * math.cos(lat0)
+            py = py * 110_540.0
         dzdx, dzdy = np.gradient(z, px, py)
         slope = np.degrees(np.arctan(np.hypot(dzdx, dzdy)))
         aspect = (np.degrees(np.arctan2(dzdy, -dzdx)) + 360) % 360

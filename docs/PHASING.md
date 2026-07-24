@@ -16,10 +16,21 @@ ingestion exists.
 - Frontend: deck.gl `H3HexagonLayer` over MapLibre (2.5D) + native Cesium polygons (3D),
   one shared data array + colour logic, domain selector, legend, search, profile panel
 
-## Phase 1 — real data on the pilot
-Wire `zonal.py` to ALOS/SRTM DEM + ESA WorldCover + Global Solar Atlas for the pilot
-AOI; replace synthetic scores with measured raw params; calibrate rubrics against ground
-truth and department records; switch `/api/hexes` to Arrow IPC.
+## Phase 1 — real data on the pilot (in progress)
+- **Terrain — done.** `atlas-pipeline build --dem <GeoTIFF>` zonal-aggregates a real DEM
+  (Copernicus GLO-30 tested) to per-cell elevation + slope + aspect (`zonal.terrain_from_dem`);
+  these feed the real scores and lift `confidence` to 55. Slope is computed in metres even for
+  geographic DEMs. `/api/hexes` also serves Arrow IPC.
+- **Remaining.** Land cover (ESA WorldCover, modal class), solar (Global Solar Atlas GHI),
+  soil (NBSS/SKUAST), then replace the still-synthetic non-terrain params; calibrate rubrics
+  against ground truth and department records.
+
+Fetch the pilot DEM tile (no auth):
+```
+curl -L -o data/dem_n33_e074.tif \
+  https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N33_00_E074_00_DEM/Copernicus_DSM_COG_10_N33_00_E074_00_DEM.tif
+atlas-pipeline build --aoi sample-data/budgam_pilot.geojson --res 9 --dem data/dem_n33_e074.tif
+```
 
 ## Phase 2 — tile outward (valley-wide, ~150k res-9 cells)
 South Kashmir (saffron + Lidder/Bringi trout), then North Kashmir (Wular/Hokersar,
